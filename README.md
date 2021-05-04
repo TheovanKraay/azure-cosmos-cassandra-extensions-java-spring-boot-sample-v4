@@ -20,13 +20,17 @@ This project framework provides the following features:
 - Library version
 - ...
 
-### Installation
+### Packaging and Integration Testing
 
-(ideally very short)
-
-- npm install [package name]
-- mvn install
-- ...
+```bash
+mvn clean package integration-test -DargLine="\
+'-Dazure.cosmos.cassandra.global-endpoint=<account-name>cassandra.cosmos.azure.com:10350' \
+'-Dazure.cosmos.cassandra.username=<username>' \
+'-Dazure.cosmos.cassandra.password=<password>' \
+'-Dazure.cosmos.cassandra.preferred-regions=<region-name>[,...]' \
+'-Dazure.cosmos.cassandra.truststore-path=<truststore-path>'" \
+'-Dazure.cosmos.cassandra.truststore-password=<truststore-password>'"
+```
 
 ### Quickstart
 (Add steps to get up and running quickly)

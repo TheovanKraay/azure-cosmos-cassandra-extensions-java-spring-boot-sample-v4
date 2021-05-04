@@ -155,8 +155,17 @@ Licensed under the MIT License.
             <include>ApplicationCommandLineRunnerTest</include>
           </includes>
           <systemPropertyVariables>
-            <azure.cosmos.cassandra.jar>${project.build.directory}/${project.build.finalName}.jar
-            </azure.cosmos.cassandra.jar>
+            <azure.cosmos.cassandra.jar>${project.build.directory}/${project.build.finalName}.jar</azure.cosmos.cassandra.jar>
+            <!-- Connection info -->
+            <azure.cosmos.cassandra.global-endpoint/>
+            <azure.cosmos.cassandra.username/>
+            <azure.cosmos.cassandra.password/>
+            <!-- Cosmos load balancing options -->
+            <azure.cosmos.cassandra.multi-region-writes>true</azure.cosmos.cassandra.multi-region-writes>
+            <azure.cosmos.cassandra.preferred-regions/>
+            <!-- Java truststore configuration -->
+            <azure.cosmos.cassandra.truststore.path/>
+            <azure.cosmos.cassandra.truststore.password/>
           </systemPropertyVariables>
         </configuration>
         <executions>

@@ -24,12 +24,18 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Timer;
+import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import static java.lang.System.out;
@@ -48,62 +54,67 @@ public class ApplicationCommandLineRunnerTest {
 
     // region Fields
 
-    private static final List<String> COMMAND;
+    private static final Pattern PROPERTY_TO_ENVIRONMENT_VARIABLE_PATTERN = Pattern.compile("([^.-]*)([.-]?)");
+    private static final Map<String, String> PROPERTIES = new TreeMap<>();
 
-    private static final List<String> EXPECTED_OUTPUT;
+    static final List<String> EXPECTED_OUTPUT;
 
-    private static final String JAR = getPropertyOrEnvironmentVariable(
+    static final String JAVA = Paths.get(System.getProperty("java.home"), "bin", "java").toString();
+
+    static final String JAR = getPropertyOrEnvironmentVariable(
         "azure.cosmos.cassandra.jar",
-        "AZURE_COSMOS_CASSANDRA_JAR",
         null);
 
-    private static final String JAVA = Paths.get(System.getProperty("java.home"), "bin", "java").toString();
-
-    private static final String JAVA_OPTIONS = getPropertyOrEnvironmentVariable(
-        "azure.cosmos.cassandra.java.options",
-        "AZURE_COSMOS_CASSANDRA_JAVA_OPTIONS",
+    static final String GLOBAL_ENDPOINT = getPropertyOrEnvironmentVariable(
+        "azure.cosmos.cassandra.global-endpoint",
         null);
 
-    private static final String LOG_PATH = getPropertyOrEnvironmentVariable(
+    static final String USERNAME = getPropertyOrEnvironmentVariable(
+        "azure.cosmos.cassandra.username",
+        null);
+
+    static final String PASSWORD = getPropertyOrEnvironmentVariable(
+        "azure.cosmos.cassandra.password",
+        null);
+
+    static final List<String> PREFERRED_REGIONS = Arrays.asList(getPropertyOrEnvironmentVariable(
+        "azure.cosmos.cassandra.preferred-regions",
+        "").split("\\s*,\\s*"));
+
+    static final String TRUSTSTORE_PASSWORD = getPropertyOrEnvironmentVariable(
+        "azure.cosmos.cassandra.truststore-password",
+        null);
+
+    static final String TRUSTSTORE_PATH = getPropertyOrEnvironmentVariable(
+        "azure.cosmos.cassandra.truststore-path",
+        null);
+
+    static final String LOG_PATH = getPropertyOrEnvironmentVariable(
         "azure.cosmos.cassandra.log-path",
-        "AZURE_COSMOS_CASSANDRA_LOG_PATH",
         Paths.get(System.getProperty("user.home"), ".local", "var", "log").toString());
 
-    private static final List<String> PREFERRED_REGIONS = getPropertyOrEnvironmentVariableList(
-        "azure.cosmos.cassandra.preferred-region-",
-        "AZURE_COSMOS_CASSANDRA_PREFERRED_REGION_",
-        3);
+    static final String JAVA_OPTIONS = getPropertyOrEnvironmentVariable(
+        "azure.cosmos.cassandra.java.options",
+        null);
 
     private static final long TIMEOUT_IN_MINUTES = 2;
 
     static {
 
+        PROPERTIES.remove("azure.cosmos.cassandra.jar");
+        PROPERTIES.remove("azure.cosmos.cassandra.java.options");
+
         out.println("--------------------------------------------------------------");
         out.println("T E S T  P A R A M E T E R S");
         out.println("--------------------------------------------------------------");
-        out.println("JAR = " + JAR);
-        out.println("JAVA = " + JAVA);
-        out.println("JAVA_OPTIONS: " + JAVA_OPTIONS);
-        out.println("LOG_PATH: " + LOG_PATH);
-        out.println("PREFERRED_REGIONS: " + PREFERRED_REGIONS);
+        out.println("azure.cosmos.cassandra.jar = " + JAR);
+
+        for (final Map.Entry<String, String> property : PROPERTIES.entrySet()) {
+            out.println(property.getKey() + " = " + property.getValue());
+        }
 
         assertThat(JAR).withFailMessage("AZURE_COSMOS_CASSANDRA_JAR is unset").isNotBlank();
         assertThat(Paths.get(JAR)).withFailMessage("Jar %s does not exist", JAR).exists();
-
-        // COMMAND
-
-        final List<String> command = new ArrayList<>();
-
-        command.add(JAVA);
-
-        if (!(JAVA_OPTIONS == null || JAVA_OPTIONS.isEmpty())) {
-            command.addAll(Arrays.asList(JAVA_OPTIONS.split("\\s+")));
-        }
-
-        command.add("-jar");
-        command.add(JAR);
-
-        COMMAND = Collections.unmodifiableList(command);
 
         // EXPECTED_OUTPUT
 
@@ -137,6 +148,13 @@ public class ApplicationCommandLineRunnerTest {
     @SuppressWarnings("ResultOfMethodCallIgnored")
     @BeforeEach
     public void createKeyspaceIfNotExists() {
+
+        int i = 0;
+
+        for (final String preferredRegion : PREFERRED_REGIONS) {
+            System.setProperty("AZURE_COSMOS_CASSANDRA_PREFERRED_REGION_" + (++i), preferredRegion);
+        }
+
         try (final CqlSession session = CqlSession.builder().build()) {
             session.execute(SimpleStatement.newInstance("CREATE KEYSPACE IF NOT EXISTS "
                 + "azure_cosmos_cassandra_driver_4_examples WITH "
@@ -155,41 +173,29 @@ public class ApplicationCommandLineRunnerTest {
      * <p>
      * CosmosLoadBalancingPolicy is configured with and without multi-region writes.
      */
+    @SuppressWarnings("ResultOfMethodCallIgnored")
     @ParameterizedTest
     @ValueSource(booleans = { false, true })
     public void run(final boolean multiRegionWrites) {
-        final ProcessBuilder builder = new ProcessBuilder();
-        builder.environment().put("AZURE_COSMOS_CASSANDRA_MULTI_REGION_WRITE", "true");
-        this.exec("run.withMultiRegionWrites-" + multiRegionWrites, builder);
-    }
 
-    // endregion
-
-    // region Privates
-
-    @SuppressFBWarnings("RCN_REDUNDANT_NULLCHECK_OF_NONNULL_VALUE")
-    @SuppressWarnings("ResultOfMethodCallIgnored")
-    private void exec(final String testName, final ProcessBuilder processBuilder) {
-
-        final String baseFilename = "azure-cosmos-cassandra-spring-boot-app-example." + testName;
-        final Path logFile = Paths.get(LOG_PATH, baseFilename + ".log");
-        final Path outputPath = Paths.get(LOG_PATH, baseFilename + ".output");
+        final String baseName = getBaseName(JAR) + ".run.withMultiRegionWrites-" + multiRegionWrites;
+        final Path logFile = Paths.get(LOG_PATH, baseName + ".log");
+        final Path outputPath = Paths.get(LOG_PATH, baseName + ".output");
 
         assertThatCode(() -> Files.createDirectories(Paths.get(LOG_PATH))).doesNotThrowAnyException();
         assertThatCode(() -> Files.deleteIfExists(logFile)).doesNotThrowAnyException();
         assertThatCode(() -> Files.deleteIfExists(outputPath)).doesNotThrowAnyException();
 
-        final Map<String, String> environment = processBuilder.command(COMMAND).environment();
-
-        environment.put("AZURE_COSMOS_CASSANDRA_LOG_FILE", logFile.toString());
-        environment.put("AZURE_COSMOS_CASSANDRA_PREFERRED_REGIONS", String.join(",", PREFERRED_REGIONS));
-
+        final ProcessBuilder builder = new ProcessBuilder(getCommand(multiRegionWrites));
         final Process process;
 
+        out.println("\nRunning command: '" + String.join("' '", builder.command()) + '\'');
+        final Instant start = Instant.now();
+
         try {
-            process = processBuilder.start();
+            process = builder.start();
         } catch (final Throwable error) {
-            fail("failed to execute command '%s' due to %s", COMMAND, error);
+            fail("failed to execute command '%s' due to %s", builder.command(), error);
             return;
         }
 
@@ -199,7 +205,7 @@ public class ApplicationCommandLineRunnerTest {
             StandardCharsets.UTF_8))) {
             output = reader.lines().collect(Collectors.toList());
         } catch (final IOException error) {
-            fail("failed to execute command '%s' due to %s", COMMAND, error);
+            fail("failed to execute command '%s' due to %s", builder.command(), error);
             return;
         }
 
@@ -218,7 +224,7 @@ public class ApplicationCommandLineRunnerTest {
         try {
             assertThat(process.waitFor(TIMEOUT_IN_MINUTES, TimeUnit.MINUTES)).isTrue();
         } catch (final InterruptedException error) {
-            fail("command '%s timed out after %d minutes", COMMAND, TIMEOUT_IN_MINUTES);
+            fail("command '%s timed out after %d minutes", builder.command(), TIMEOUT_IN_MINUTES);
             return;
         }
 
@@ -241,11 +247,11 @@ public class ApplicationCommandLineRunnerTest {
             out.println("---------------------------------------------------------------------------------");
             out.println("LOG DUMP");
             out.println("---------------------------------------------------------------------------------");
-            out.println("COMMAND: " + COMMAND);
-            out.println("ENVIRONMENT: " + processBuilder.environment());
-            out.println("LOG_FILE: " + logFile);
-            out.println("OUTPUT_FILE: " + outputFile);
-            out.println("EXIT_VALUE: " + process.exitValue());
+            out.println("command = " + builder.command());
+            out.println("exit-value: " + process.exitValue());
+            out.println("log-file: " + logFile);
+            out.println("output-file: " + outputFile);
+            out.println("environment: " + builder.environment());
 
             try (final BufferedReader reader = Files.newBufferedReader(logFile, StandardCharsets.UTF_8)) {
                 reader.lines().forEach(out::println);
@@ -263,6 +269,67 @@ public class ApplicationCommandLineRunnerTest {
 
             throw assertionError;
         }
+
+        final Instant end = Instant.now();
+
+        out.println("Run succeeded");
+        out.println("  Total time: " + Duration.between(start, end));
+        out.println("  Finished at: " + LocalDateTime.now());
+        out.println("  Log file at: " + logFile);
+        out.println("  Output file at: " + outputFile);
+    }
+
+    // endregion
+
+    // region Privates
+
+    /**
+     * Returns the base name of the file or directory denoted by {@code path} as a {@linkplain String string}.
+     *
+     * The base name is the file name without its extension.
+     *
+     * @param path A relative or absolute path name.
+     *
+     * @return The base name of the file or directory denoted by {@code path}
+     */
+    @SuppressWarnings("SameParameterValue")
+    private static String getBaseName(final String path) {
+        final String filename = Paths.get(path).getFileName().toString();
+        final int index = filename.lastIndexOf('.');
+        return index < 0 ? filename : filename.substring(0, index);
+    }
+
+    /**
+     * Gets the command line for a test run.
+     *
+     * The command line constructed enables or disables multi-region writes by setting the value of system property
+     * {@code azure.cosmos.cassandra.multi-region-writes} to {@code true} or {@code false}.
+     *
+     * @param multiRegionWrites {@code true} if multi-region writes should be enabled; otherwise {@code false}.
+     *
+     * @return A list of the command line arguments.
+     */
+    private static List<String> getCommand(final boolean multiRegionWrites) {
+
+        final List<String> command = new ArrayList<>();
+
+        command.add(JAVA);
+
+        if (!(JAVA_OPTIONS == null || JAVA_OPTIONS.isEmpty())) {
+            command.addAll(Arrays.asList(JAVA_OPTIONS.split("\\s+")));
+        }
+
+        System.setProperty("azure.cosmos.cassandra.multi-region-writes", multiRegionWrites ? "true" : "false");
+        command.add("-Dazure.cosmos.cassandra.multi-region-writes=" + (multiRegionWrites ? "true" : "false"));
+
+        for (final Map.Entry<String, String> property : PROPERTIES.entrySet()) {
+            command.add("-D" + property.getKey() + '=' + property.getValue());
+        }
+
+        command.add("-jar");
+        command.add(JAR);
+
+        return command;
     }
 
     /**
@@ -271,19 +338,22 @@ public class ApplicationCommandLineRunnerTest {
      * If neither {@code property} or {@code variable} is set, {@code defaultValue} is returned.
      *
      * @param property     a system property name.
-     * @param variable     an environment variable name.
      * @param defaultValue the default value--which may be {@code null}--to be used if neither {@code property} or
      *                     {@code variable} is set.
      *
      * @return The value of the specified {@code property}, the value of the specified environment {@code variable}, or
      * {@code defaultValue}.
      */
-    private static String getPropertyOrEnvironmentVariable(
-        @NonNull final String property, @NonNull final String variable, final String defaultValue) {
+    private static String getPropertyOrEnvironmentVariable(@NonNull final String property, final String defaultValue) {
 
         String value = System.getProperty(property);
 
-        if (value == null) {
+        if (value == null || value.isEmpty()) {
+            final String variable = PROPERTY_TO_ENVIRONMENT_VARIABLE_PATTERN.matcher(property).replaceAll(match -> {
+                final String substring = match.group(1).toUpperCase(Locale.ROOT);
+                final String delimiter = match.group(2);
+                return delimiter.isEmpty() ? substring : substring + '_';
+            });
             value = System.getenv(variable);
         }
 
@@ -291,37 +361,12 @@ public class ApplicationCommandLineRunnerTest {
             value = defaultValue;
         }
 
-        return value;
-    }
-
-    /**
-     * Get the value of the specified system {@code property} or--if it is unset--environment {@code variable}.
-     * <p>
-     * If neither {@code property} or {@code variable} is set, {@code defaultValue} is returned.
-     *
-     * @param property a system property name.
-     * @param variable an environment variable name.
-     * @param limit    the default value--which may be {@code null}--to be used if neither {@code property} or {@code
-     *                 variable} is set.
-     *
-     * @return The value of the specified {@code property}, the value of the specified environment {@code variable}, or
-     * {@code defaultValue}.
-     */
-    @SuppressWarnings("SameParameterValue")
-    static List<String> getPropertyOrEnvironmentVariableList(
-        @NonNull final String property, @NonNull final String variable, final int limit) {
-
-        final List<String> list = new ArrayList<>(limit);
-
-        for (int i = 1; i <= limit; i++) {
-            final String value = getPropertyOrEnvironmentVariable(property + i, variable + i, null);
-            if (value == null) {
-                break;
-            }
-            list.add(value);
+        if (value != null) {
+            System.setProperty(property, value);
         }
 
-        return list;
+        PROPERTIES.put(property, value);
+        return value;
     }
 
     // endregion
