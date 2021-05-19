@@ -39,6 +39,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import static java.lang.System.out;
+import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.AssertionsForClassTypes.assertThatCode;
 import static org.assertj.core.api.Fail.fail;
@@ -173,6 +174,7 @@ public class ApplicationCommandLineRunnerTest {
      * <p>
      * CosmosLoadBalancingPolicy is configured with and without multi-region writes.
      */
+    @SuppressFBWarnings(value = "RCN_REDUNDANT_NULLCHECK_OF_NONNULL_VALUE", justification = "false alarm")
     @SuppressWarnings("ResultOfMethodCallIgnored")
     @ParameterizedTest
     @ValueSource(booleans = { false, true })
@@ -292,11 +294,14 @@ public class ApplicationCommandLineRunnerTest {
      *
      * @return The base name of the file or directory denoted by {@code path}
      */
+    @SuppressFBWarnings("NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE")
     @SuppressWarnings("SameParameterValue")
-    private static String getBaseName(final String path) {
-        final String filename = Paths.get(path).getFileName().toString();
-        final int index = filename.lastIndexOf('.');
-        return index < 0 ? filename : filename.substring(0, index);
+    @NonNull
+    private static String getBaseName(@NonNull final String path) {
+        final Path filename = requireNonNull(Paths.get(path).getFileName(), "expected file or directory name");
+        final String value = filename.toString();
+        final int index = value.lastIndexOf('.');
+        return index < 0 ? value : value.substring(0, index);
     }
 
     /**
