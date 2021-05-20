@@ -30,9 +30,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
-import java.util.Timer;
 import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
@@ -57,6 +55,7 @@ public class ApplicationCommandLineRunnerTest {
 
     private static final Pattern PROPERTY_TO_ENVIRONMENT_VARIABLE_PATTERN = Pattern.compile("([^.-]*)([.-]?)");
     private static final Map<String, String> PROPERTIES = new TreeMap<>();
+    private static final Map<String, String> VARIABLES = new TreeMap<>();
 
     static final List<String> EXPECTED_OUTPUT;
 
@@ -139,6 +138,14 @@ public class ApplicationCommandLineRunnerTest {
 
         assertThat(error).withFailMessage("could not read expected.output resource: ", error).isNull();
         EXPECTED_OUTPUT = expectedOutput;
+
+        // Extra variables for HOCON support (see application.conf)
+
+        int i = 0;
+
+        for (final String preferredRegion : PREFERRED_REGIONS) {
+            VARIABLES.put("AZURE_COSMOS_CASSANDRA_PREFERRED_REGION_" + ++i, preferredRegion);
+        }
     }
 
     // endregion
@@ -189,6 +196,7 @@ public class ApplicationCommandLineRunnerTest {
         assertThatCode(() -> Files.deleteIfExists(outputPath)).doesNotThrowAnyException();
 
         final ProcessBuilder builder = new ProcessBuilder(getCommand(multiRegionWrites));
+        builder.environment().putAll(VARIABLES);
         final Process process;
 
         out.println("\nRunning command: '" + String.join("' '", builder.command()) + '\'');
@@ -351,14 +359,17 @@ public class ApplicationCommandLineRunnerTest {
      */
     private static String getPropertyOrEnvironmentVariable(@NonNull final String property, final String defaultValue) {
 
+        final StringBuilder builder = new StringBuilder(property.length());
+
+        property.chars().forEachOrdered(c -> {
+            builder.appendCodePoint(c == '.' || c == '-' ? '_' : Character.toUpperCase(c));
+        });
+
+        final String variable = builder.toString();
+
         String value = System.getProperty(property);
 
         if (value == null || value.isEmpty()) {
-            final String variable = PROPERTY_TO_ENVIRONMENT_VARIABLE_PATTERN.matcher(property).replaceAll(match -> {
-                final String substring = match.group(1).toUpperCase(Locale.ROOT);
-                final String delimiter = match.group(2);
-                return delimiter.isEmpty() ? substring : substring + '_';
-            });
             value = System.getenv(variable);
         }
 
@@ -371,6 +382,8 @@ public class ApplicationCommandLineRunnerTest {
         }
 
         PROPERTIES.put(property, value);
+        VARIABLES.put(variable, value);
+
         return value;
     }
 

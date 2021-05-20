@@ -20,9 +20,7 @@ Licensed under the MIT License.
   <properties>
     <main-class>com.azure.cosmos.cassandra.example.ApplicationCommandLineRunner</main-class>
     <!-- Main dependency versions -->
-    <version.azure-cosmos-cassandra-spring-data-extensions>[1.0,1.1)
-    </version.azure-cosmos-cassandra-spring-data-extensions>
-    <version.junit-jupiter>[5.7,5.8)</version.junit-jupiter>
+    <version.azure-cosmos-cassandra-spring-data-extensions>[1.0,1.1)</version.azure-cosmos-cassandra-spring-data-extensions>
     <version.opencsv>[5.4,5.5)</version.opencsv>
     <version.reactor>[3.4,3.5)</version.reactor>
     <version.spring-boot-starter-data-cassandra>[2.4,2.5)</version.spring-boot-starter-data-cassandra>
@@ -145,7 +143,6 @@ Licensed under the MIT License.
         </plugin>
       </plugins>
     </pluginManagement>
-
     <plugins>
       <plugin>
         <artifactId>maven-failsafe-plugin</artifactId>
