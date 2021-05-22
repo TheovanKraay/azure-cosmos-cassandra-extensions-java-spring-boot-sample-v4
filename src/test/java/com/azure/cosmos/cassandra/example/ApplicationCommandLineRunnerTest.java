@@ -180,8 +180,10 @@ public class ApplicationCommandLineRunnerTest {
      * Runs the spring-boot-app and ensures that it completes with status code zero.
      * <p>
      * CosmosLoadBalancingPolicy is configured with and without multi-region writes.
+     *
+     * @param multiRegionWrites {@code true} if multi-region writes should be enabled; otherwise {@code false}.
      */
-    @SuppressFBWarnings(value = "RCN_REDUNDANT_NULLCHECK_OF_NONNULL_VALUE", justification = "false alarm")
+    @SuppressFBWarnings(value = "RCN_REDUNDANT_NULLCHECK_OF_NONNULL_VALUE", justification = "False alarm on Java 11")
     @SuppressWarnings("ResultOfMethodCallIgnored")
     @ParameterizedTest
     @ValueSource(booleans = { false, true })
