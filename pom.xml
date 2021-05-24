@@ -19,10 +19,9 @@ Licensed under the MIT License.
 
   <properties>
     <main-class>com.azure.cosmos.cassandra.example.ApplicationCommandLineRunner</main-class>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <javadoc.options/>
     <!-- Main dependency versions -->
-    <version.azure-cosmos-cassandra-spring-data-extensions>[1.0,1.1)
-    </version.azure-cosmos-cassandra-spring-data-extensions>
-    <version.junit-jupiter>[5.7,5.8)</version.junit-jupiter>
     <version.opencsv>[5.4,5.5)</version.opencsv>
     <version.reactor>[3.4,3.5)</version.reactor>
     <version.spring-boot-starter-data-cassandra>[2.4,2.5)</version.spring-boot-starter-data-cassandra>
@@ -36,7 +35,7 @@ Licensed under the MIT License.
     <dependency>
       <groupId>com.azure</groupId>
       <artifactId>azure-cosmos-cassandra-spring-data-extensions</artifactId>
-      <version>[1.0,1.1)</version>
+      <version>${project.version}</version>
       <scope>compile</scope>
     </dependency>
     <dependency>
@@ -87,11 +86,22 @@ Licensed under the MIT License.
         </plugin>
         <plugin>
           <artifactId>maven-checkstyle-plugin</artifactId>
-          <version>3.1.1</version>
+          <version>3.1.2</version>
+          <dependencies>
+            <dependency>
+              <groupId>com.puppycrawl.tools</groupId>
+              <artifactId>checkstyle</artifactId>
+              <version>8.42</version>
+            </dependency>
+          </dependencies>
         </plugin>
         <plugin>
           <artifactId>maven-compiler-plugin</artifactId>
           <version>3.8.1</version>
+        </plugin>
+        <plugin>
+          <artifactId>maven-dependency-plugin</artifactId>
+          <version>3.1.2</version>
         </plugin>
         <plugin>
           <artifactId>maven-deploy-plugin</artifactId>
@@ -136,7 +146,7 @@ Licensed under the MIT License.
         <plugin>
           <groupId>com.github.spotbugs</groupId>
           <artifactId>spotbugs-maven-plugin</artifactId>
-          <version>4.1.4</version>
+          <version>4.2.3</version>
         </plugin>
         <plugin>
           <groupId>org.springframework.boot</groupId>
@@ -145,8 +155,26 @@ Licensed under the MIT License.
         </plugin>
       </plugins>
     </pluginManagement>
-
     <plugins>
+      <plugin>
+        <artifactId>maven-checkstyle-plugin</artifactId>
+        <configuration>
+          <configLocation>azure-cosmos-style.xml</configLocation>
+          <propertyExpansion>samedir=${project.basedir}</propertyExpansion>
+          <consoleOutput>true</consoleOutput>
+          <failsOnError>true</failsOnError>
+          <linkXRef>false</linkXRef>
+        </configuration>
+        <executions>
+          <execution>
+            <id>validate</id>
+            <phase>validate</phase>
+            <goals>
+              <goal>check</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
       <plugin>
         <artifactId>maven-failsafe-plugin</artifactId>
         <configuration>
@@ -198,6 +226,12 @@ Licensed under the MIT License.
         </executions>
       </plugin>
       <plugin>
+        <artifactId>maven-resources-plugin</artifactId>
+        <configuration>
+          <propertiesEncoding>UTF-8</propertiesEncoding>
+        </configuration>
+      </plugin>
+      <plugin>
         <artifactId>maven-source-plugin</artifactId>
         <executions>
           <execution>
@@ -212,22 +246,19 @@ Licensed under the MIT License.
         <artifactId>maven-surefire-plugin</artifactId>
         <configuration>
           <useModulePath>false</useModulePath>
-          <excludes>
-            <exclude>ApplicationCommandLineRunnerTest</exclude>
-          </excludes>
         </configuration>
       </plugin>
       <plugin>
         <groupId>com.github.spotbugs</groupId>
         <artifactId>spotbugs-maven-plugin</artifactId>
         <configuration>
+          <spotbugsXmlOutputDirectory>${project.build.directory}/spotbugs</spotbugsXmlOutputDirectory>
           <effort>max</effort>
+          <failOnError>true</failOnError>
+          <fork>true</fork>
+          <includeTests>true</includeTests>
           <threshold>Low</threshold>
           <xmlOutput>true</xmlOutput>
-          <spotbugsXmlOutputDirectory>${project.build.directory}/spotbugs</spotbugsXmlOutputDirectory>
-          <failOnError>true</failOnError>
-          <includeTests>true</includeTests>
-          <fork>true</fork>
         </configuration>
         <executions>
           <execution>
@@ -257,7 +288,6 @@ Licensed under the MIT License.
   </build>
 
   <profiles>
-
     <!-- Setup for Java 8, excludes module-info.java -->
     <profile>
       <id>java-8</id>
@@ -276,27 +306,7 @@ Licensed under the MIT License.
           </resource>
         </resources>
         <plugins>
-          <plugin>
-            <artifactId>maven-checkstyle-plugin</artifactId>
-            <configuration>
-              <configLocation>azure-cosmos-style.xml</configLocation>
-              <propertyExpansion>samedir=${project.basedir}</propertyExpansion>
-              <encoding>UTF-8</encoding>
-              <consoleOutput>true</consoleOutput>
-              <failsOnError>true</failsOnError>
-              <linkXRef>false</linkXRef>
-            </configuration>
-            <executions>
-              <execution>
-                <id>validate</id>
-                <phase>validate</phase>
-                <goals>
-                  <goal>check</goal>
-                </goals>
-              </execution>
-            </executions>
-          </plugin>
-          <!-- Don't compile module-info.java, see java-lts profile -->
+          <!-- Don't compile module-info.java -->
           <plugin>
             <artifactId>maven-compiler-plugin</artifactId>
             <configuration>
@@ -307,7 +317,7 @@ Licensed under the MIT License.
               </excludes>
             </configuration>
           </plugin>
-          <!-- Avoid errors from module-info -->
+          <!-- Don't document module-info.java -->
           <plugin>
             <artifactId>maven-javadoc-plugin</artifactId>
             <configuration>
@@ -320,6 +330,7 @@ Licensed under the MIT License.
       </build>
       <reporting>
         <plugins>
+          <!-- Don't document module-info.java -->
           <plugin>
             <artifactId>maven-javadoc-plugin</artifactId>
             <configuration>
@@ -331,7 +342,6 @@ Licensed under the MIT License.
         </plugins>
       </reporting>
     </profile>
-
     <!-- Setup for Java LTS+, currently JDK 11 and up -->
     <profile>
       <id>java-lts</id>
@@ -346,26 +356,6 @@ Licensed under the MIT License.
           </resource>
         </resources>
         <plugins>
-          <plugin>
-            <artifactId>maven-checkstyle-plugin</artifactId>
-            <configuration>
-              <configLocation>azure-cosmos-style.xml</configLocation>
-              <propertyExpansion>samedir=${project.basedir}</propertyExpansion>
-              <encoding>UTF-8</encoding>
-              <consoleOutput>true</consoleOutput>
-              <failsOnError>true</failsOnError>
-              <linkXRef>false</linkXRef>
-            </configuration>
-            <executions>
-              <execution>
-                <id>validate</id>
-                <phase>validate</phase>
-                <goals>
-                  <goal>check</goal>
-                </goals>
-              </execution>
-            </executions>
-          </plugin>
           <plugin>
             <artifactId>maven-compiler-plugin</artifactId>
             <configuration>

@@ -30,15 +30,14 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
-import java.util.Timer;
 import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import static java.lang.System.out;
+import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.AssertionsForClassTypes.assertThatCode;
 import static org.assertj.core.api.Fail.fail;
@@ -56,6 +55,7 @@ public class ApplicationCommandLineRunnerTest {
 
     private static final Pattern PROPERTY_TO_ENVIRONMENT_VARIABLE_PATTERN = Pattern.compile("([^.-]*)([.-]?)");
     private static final Map<String, String> PROPERTIES = new TreeMap<>();
+    private static final Map<String, String> VARIABLES = new TreeMap<>();
 
     static final List<String> EXPECTED_OUTPUT;
 
@@ -128,7 +128,7 @@ public class ApplicationCommandLineRunnerTest {
         List<String> expectedOutput;
         IOException error;
 
-        try (final BufferedReader reader = new BufferedReader(new InputStreamReader(stream, StandardCharsets.UTF_8))) {
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(stream, StandardCharsets.UTF_8))) {
             expectedOutput = reader.lines().collect(Collectors.toList());
             error = null;
         } catch (final IOException exception) {
@@ -138,13 +138,24 @@ public class ApplicationCommandLineRunnerTest {
 
         assertThat(error).withFailMessage("could not read expected.output resource: ", error).isNull();
         EXPECTED_OUTPUT = expectedOutput;
+
+        // Extra variables for HOCON support (see application.conf)
+
+        int i = 0;
+
+        for (final String preferredRegion : PREFERRED_REGIONS) {
+            VARIABLES.put("AZURE_COSMOS_CASSANDRA_PREFERRED_REGION_" + ++i, preferredRegion);
+        }
     }
 
     // endregion
 
     // region Methods
 
-    @SuppressFBWarnings("RCN_REDUNDANT_NULLCHECK_OF_NONNULL_VALUE")
+    /**
+     * Creates the azure_cosmos_cassandra_driver_4_examples keyspace, if it does not already exist.
+     */
+    @SuppressFBWarnings(value = "RCN_REDUNDANT_NULLCHECK_OF_NONNULL_VALUE", justification = "False alarm on Java 11+")
     @SuppressWarnings("ResultOfMethodCallIgnored")
     @BeforeEach
     public void createKeyspaceIfNotExists() {
@@ -155,7 +166,7 @@ public class ApplicationCommandLineRunnerTest {
             System.setProperty("AZURE_COSMOS_CASSANDRA_PREFERRED_REGION_" + (++i), preferredRegion);
         }
 
-        try (final CqlSession session = CqlSession.builder().build()) {
+        try (CqlSession session = CqlSession.builder().build()) {
             session.execute(SimpleStatement.newInstance("CREATE KEYSPACE IF NOT EXISTS "
                 + "azure_cosmos_cassandra_driver_4_examples WITH "
                 + "REPLICATION={"
@@ -172,7 +183,10 @@ public class ApplicationCommandLineRunnerTest {
      * Runs the spring-boot-app and ensures that it completes with status code zero.
      * <p>
      * CosmosLoadBalancingPolicy is configured with and without multi-region writes.
+     *
+     * @param multiRegionWrites {@code true} if multi-region writes should be enabled; otherwise {@code false}.
      */
+    @SuppressFBWarnings(value = "RCN_REDUNDANT_NULLCHECK_OF_NONNULL_VALUE", justification = "False alarm on Java 11+")
     @SuppressWarnings("ResultOfMethodCallIgnored")
     @ParameterizedTest
     @ValueSource(booleans = { false, true })
@@ -187,6 +201,7 @@ public class ApplicationCommandLineRunnerTest {
         assertThatCode(() -> Files.deleteIfExists(outputPath)).doesNotThrowAnyException();
 
         final ProcessBuilder builder = new ProcessBuilder(getCommand(multiRegionWrites));
+        builder.environment().putAll(VARIABLES);
         final Process process;
 
         out.println("\nRunning command: '" + String.join("' '", builder.command()) + '\'');
@@ -201,7 +216,7 @@ public class ApplicationCommandLineRunnerTest {
 
         final List<String> output;
 
-        try (final BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream(),
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream(),
             StandardCharsets.UTF_8))) {
             output = reader.lines().collect(Collectors.toList());
         } catch (final IOException error) {
@@ -211,7 +226,7 @@ public class ApplicationCommandLineRunnerTest {
 
         final File outputFile = outputPath.toFile();
 
-        try (final Writer writer = new OutputStreamWriter(new FileOutputStream(outputFile), StandardCharsets.UTF_8)) {
+        try (Writer writer = new OutputStreamWriter(new FileOutputStream(outputFile), StandardCharsets.UTF_8)) {
             for (final String line : output) {
                 writer.write(line);
                 writer.write('\n');
@@ -253,7 +268,7 @@ public class ApplicationCommandLineRunnerTest {
             out.println("output-file: " + outputFile);
             out.println("environment: " + builder.environment());
 
-            try (final BufferedReader reader = Files.newBufferedReader(logFile, StandardCharsets.UTF_8)) {
+            try (BufferedReader reader = Files.newBufferedReader(logFile, StandardCharsets.UTF_8)) {
                 reader.lines().forEach(out::println);
             } catch (final IOException error) {
                 out.println("---------------------------------------------------------------------------------");
@@ -292,11 +307,14 @@ public class ApplicationCommandLineRunnerTest {
      *
      * @return The base name of the file or directory denoted by {@code path}
      */
+    @SuppressFBWarnings("NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE")
     @SuppressWarnings("SameParameterValue")
-    private static String getBaseName(final String path) {
-        final String filename = Paths.get(path).getFileName().toString();
-        final int index = filename.lastIndexOf('.');
-        return index < 0 ? filename : filename.substring(0, index);
+    @NonNull
+    private static String getBaseName(@NonNull final String path) {
+        final Path filename = requireNonNull(Paths.get(path).getFileName(), "expected file or directory name");
+        final String value = filename.toString();
+        final int index = value.lastIndexOf('.');
+        return index < 0 ? value : value.substring(0, index);
     }
 
     /**
@@ -346,14 +364,17 @@ public class ApplicationCommandLineRunnerTest {
      */
     private static String getPropertyOrEnvironmentVariable(@NonNull final String property, final String defaultValue) {
 
+        final StringBuilder builder = new StringBuilder(property.length());
+
+        property.chars().forEachOrdered(c -> {
+            builder.appendCodePoint(c == '.' || c == '-' ? '_' : Character.toUpperCase(c));
+        });
+
+        final String variable = builder.toString();
+
         String value = System.getProperty(property);
 
         if (value == null || value.isEmpty()) {
-            final String variable = PROPERTY_TO_ENVIRONMENT_VARIABLE_PATTERN.matcher(property).replaceAll(match -> {
-                final String substring = match.group(1).toUpperCase(Locale.ROOT);
-                final String delimiter = match.group(2);
-                return delimiter.isEmpty() ? substring : substring + '_';
-            });
             value = System.getenv(variable);
         }
 
@@ -366,6 +387,8 @@ public class ApplicationCommandLineRunnerTest {
         }
 
         PROPERTIES.put(property, value);
+        VARIABLES.put(variable, value);
+
         return value;
     }
 
