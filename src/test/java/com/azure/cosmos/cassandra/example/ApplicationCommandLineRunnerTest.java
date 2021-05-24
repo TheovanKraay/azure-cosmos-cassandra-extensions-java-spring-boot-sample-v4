@@ -261,13 +261,16 @@ public class ApplicationCommandLineRunnerTest {
         } catch (final AssertionError assertionError) {
 
             out.println("---------------------------------------------------------------------------------");
-            out.println("LOG DUMP");
+            out.println("ERROR DUMP");
             out.println("---------------------------------------------------------------------------------");
             out.println("command = " + builder.command());
             out.println("exit-value: " + process.exitValue());
             out.println("log-file: " + logFile);
             out.println("output-file: " + outputFile);
             out.println("environment: " + builder.environment());
+            out.println();
+            out.println("LOG FILE");
+            out.println("--------");
 
             try (BufferedReader reader = Files.newBufferedReader(logFile, StandardCharsets.UTF_8)) {
                 reader.lines().forEach(out::println);
@@ -275,6 +278,14 @@ public class ApplicationCommandLineRunnerTest {
                 out.println("Failed to dump log file " + logFile + " due to: " + error);
                 error.printStackTrace(out);
                 assertionError.addSuppressed(error);
+            }
+
+            out.println();
+            out.println("OUTPUT FILE");
+            out.println("-----------");
+
+            for (String line : output) {
+                out.println(line);
             }
 
             out.println("---------------------------------------------------------------------------------");
