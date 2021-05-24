@@ -201,6 +201,7 @@ public class ApplicationCommandLineRunnerTest {
         assertThatCode(() -> Files.deleteIfExists(outputPath)).doesNotThrowAnyException();
 
         final ProcessBuilder builder = new ProcessBuilder(getCommand(multiRegionWrites));
+        VARIABLES.put("AZURE_COSMOS_CASSANDRA_LOG_FILE", logFile.toString());
         builder.environment().putAll(VARIABLES);
         final Process process;
 
@@ -271,9 +272,7 @@ public class ApplicationCommandLineRunnerTest {
             try (BufferedReader reader = Files.newBufferedReader(logFile, StandardCharsets.UTF_8)) {
                 reader.lines().forEach(out::println);
             } catch (final IOException error) {
-                out.println("---------------------------------------------------------------------------------");
-                out.println("LOG DUMP ERROR");
-                out.println("---------------------------------------------------------------------------------");
+                out.println("Failed to dump log file " + logFile + " due to: " + error);
                 error.printStackTrace(out);
                 assertionError.addSuppressed(error);
             }
