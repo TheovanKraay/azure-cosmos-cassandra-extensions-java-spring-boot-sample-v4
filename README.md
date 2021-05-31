@@ -1,3 +1,13 @@
+---
+page_type: sample
+languages:
+- java
+products:
+- azure
+description: "Azure Cosmos DB is a globally distributed multi-model database. One of the supported APIs is the Cassandra API. This sample shows how to use Spring Data for Apache Cassandra with Azure Cosmos DB awareness features."
+urlFragment: azure-cosmos-cassandra-extensions-java-spring-boot-sample-v4
+---
+
 # Project Name
 
 (short, 1-3 sentenced, description of the project)
