@@ -200,6 +200,7 @@ Licensed under the MIT License.
           <execution>
             <goals>
               <goal>integration-test</goal>
+              <goal>verify</goal>
             </goals>
           </execution>
         </executions>
@@ -246,6 +247,9 @@ Licensed under the MIT License.
         <artifactId>maven-surefire-plugin</artifactId>
         <configuration>
           <useModulePath>false</useModulePath>
+          <excludes>
+            <exclude>ApplicationCommandLineRunnerTest</exclude>
+          </excludes>
         </configuration>
       </plugin>
       <plugin>
