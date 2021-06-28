@@ -49,8 +49,8 @@ Azure Cosmos DB is a globally distributed multi-model database. One of the suppo
 1. Run `java -jar target/azure-cosmos-cassandra-spring-boot-app-example-1.0.1.jar` in a terminal to start your java application. 
 
 1. This will create a keyspace called `azure_cosmos_cassandra_driver_4_examples` and a table called `people`, and then run a load test with many concurrent threads in the database. Please inspect the code at `com.azure.cosmos.cassandra.example.ApplicationCommandLineRunner` under the src/main directory to understand how it functions. 
-
-   ![Console output](./media/output.png)
+ 
+    :::image type="content" source="./media/output.png" alt-text="Console output":::
 
 
 ### Packaging and Integration Testing
