@@ -51,8 +51,8 @@ Azure Cosmos DB is a globally distributed multi-model database. One of the suppo
 1. This will create a keyspace called `azure_cosmos_cassandra_driver_4_examples` and a table called `people`, and then run a load test with many concurrent threads in the database. Please inspect the code at `com.azure.cosmos.cassandra.example.ApplicationCommandLineRunner` under the src/main directory to understand how it functions. 
  
     ![Console output](./media/output.png)
-    <!-- :::image type="content" source="./media/output.png" alt-text="Console output"::: -->
 
+You should always perform sufficient load testing to ensure that the implementation meets your requirements.
 
 ### Packaging and Integration Testing
 
